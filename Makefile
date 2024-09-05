@@ -1,3 +1,5 @@
+# Run with `make live` or `make -j5` to run commands in parallel
+
 # run templ generation in watch mode to detect all .templ files and
 # re-create _templ.txt files on change, then send reload event to browser.
 # Default url: http://localhost:7331

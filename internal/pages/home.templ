@@ -1,4 +1,5 @@
-package main
+
+package pages
 
 import "context"
 // <script src="/assets/js/htmx.min.js"></script>
@@ -10,7 +11,8 @@ func NameFromContext(ctx context.Context) string {
 }
 
 templ Home(name string) {
-	<div>Hello { name }</div>
+    <link href="/assets/styles.css" rel="stylesheet">
+    <div class="border rounded-xl text-3xl">Hello { name }</div>
 	<div>Hello { NameFromContext(ctx) } (from context)</div>
 }
 
