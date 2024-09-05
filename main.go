@@ -1,82 +1,36 @@
 package main
 
 import (
-	"crypto/tls"
-	"encoding/json"
-	"fmt"
 	"log"
-	"net/http"
-	"os"
+	"log/slog"
 
-	"github.com/joho/godotenv"
-	"github.com/quic-go/quic-go/http3"
-	"golang.org/x/crypto/acme/autocert"
+	"github.com/a-h/templ"
+	"github.com/gofiber/fiber/v2"
 )
 
-func handlerMux() *http.ServeMux {
-	mux := http.NewServeMux()
-
-	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprintf(w, "Hello, TLS user! Your config: %+v", r.TLS)
+func main() {
+	app := fiber.New()
+	app.Get("/:name?", func(c *fiber.Ctx) error {
+		name := c.Params("name")
+		c.Locals("name", name)
+		if name == "" {
+			name = "world"
+		}
+		return Render(c, Home(name))
 	})
 
-	return mux
+	app.Use(NotFoundMiddleware)
+
+	slog.Info("Starting HTTP Server")
+	log.Fatal(app.Listen(":8080"))
 }
 
-func main() {
-	err := godotenv.Load()
-	if err != nil {
-		log.Fatal("Error loading .env file")
-	}
+func NotFoundMiddleware(c *fiber.Ctx) error {
+	c.Status(fiber.StatusNotFound)
+	return Render(c, NotFound())
+}
 
-	email := os.Getenv("EXIFMOD_EMAIL")
-	var hosts []string
-	err = json.Unmarshal([]byte(os.Getenv("EXIFMOD_HOSTS")), &hosts)
-	if err != nil {
-		log.Fatalf("Error loading .env file: %v", err)
-	}
-
-	log.Printf("Hosts: %+v", hosts)
-	certManager := &autocert.Manager{
-		Cache:      autocert.DirCache("exifmod_certs"),
-		Prompt:     autocert.AcceptTOS,
-		Email:      email,
-		HostPolicy: autocert.HostWhitelist(hosts...),
-	}
-	handler := handlerMux()
-
-	quic_server := &http3.Server{
-		Addr:    ":https",
-		Handler: handler,
-		TLSConfig: http3.ConfigureTLSConfig(&tls.Config{
-			GetCertificate: certManager.GetCertificate,
-		}),
-	}
-
-	// Requires special handler to set QUIC Alt-Svc headers
-	http_server := &http.Server{
-		Addr: ":https",
-		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			quic_server.SetQUICHeaders(w.Header())
-			handler.ServeHTTP(w, r)
-		}),
-		TLSConfig: certManager.TLSConfig(),
-	}
-
-	log.Printf("Starting Servers")
-	hErr := make(chan error, 1)
-	qErr := make(chan error, 1)
-	go func() {
-		hErr <- http_server.ListenAndServeTLS("", "")
-	}()
-	go func() {
-		qErr <- quic_server.ListenAndServe()
-	}()
-
-	select {
-	case err := <-hErr:
-		log.Fatalf("HTTP Server Error: %v", err)
-	case err := <-qErr:
-		log.Fatalf("QUIC Server Error: %v", err)
-	}
+func Render(c *fiber.Ctx, component templ.Component) error {
+	c.Set("Content-Type", "text/html")
+	return component.Render(c.Context(), c.Response().BodyWriter())
 }

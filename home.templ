@@ -1,7 +1,19 @@
 package main
 
-templ hello(name string) {
-	<div>
-		Hello, { name }
-	</div>
+import "context"
+// <script src="/assets/js/htmx.min.js"></script>
+func NameFromContext(ctx context.Context) string {
+	if name, ok := ctx.Value("name").(string); ok && name != "" {
+		return name
+	}
+	return "World"
+}
+
+templ Home(name string) {
+	<div>Hello { name }</div>
+	<div>Hello { NameFromContext(ctx) } (from context)</div>
+}
+
+templ NotFound() {
+	<div>404</div>
 }
